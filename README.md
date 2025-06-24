@@ -61,20 +61,27 @@ gcloud iam service-accounts keys create terraform-deploy.json \
 <details>
 
 ```bash
-# GitHub Actions OIDC Token for GCP.
+# GitHub Actions OIDC Token for GCP
 
 ## 環境変数保存
 export GCP_PROJECT_ID=プロジェクトID
 export POOL_NAME=github-actions
 export PROVIDER_NAME=gha-provider
-export GITHUB_REPO=tier940/gke-test
+export GITHUB_REPO=レポジトリ名
 
 ## IAM Service Account Credentials API を有効
-gcloud services enable iamcredentials.googleapis.com
+gcloud services enable iamcredentials.googleapis.com \
+    --project=${GCP_PROJECT_ID}
+
+## サービスアカウント作成
+gcloud iam service-accounts create gha-provider \
+    --project=${GCP_PROJECT_ID}
 
 ## Workload IdentityにPoolを作成
 gcloud iam workload-identity-pools create ${POOL_NAME} \
-    --location="global" --display-name="use from GitHub Actions"
+    --project=${GCP_PROJECT_ID} \
+    --location="global" \
+    --display-name="use from GitHub Actions"
 export WORKLOAD_IDENTITY_POOL_ID=$( \
     gcloud iam workload-identity-pools describe ${POOL_NAME} \
     --location="global" --format="value(name)" \
@@ -82,15 +89,16 @@ export WORKLOAD_IDENTITY_POOL_ID=$( \
 
 ## PoolにProvierを作成
 gcloud iam workload-identity-pools providers create-oidc ${PROVIDER_NAME} \
+    --project=${GCP_PROJECT_ID} \
     --location="global" \
     --workload-identity-pool=${POOL_NAME} \
     --display-name="use from GitHub Actions provider" \
-    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.  actor,attribute.aud=assertion.aud" \
+    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.actor" \
     --issuer-uri="https://token.actions.githubusercontent.com"
 
 ## 可能なリポジトリを絞る
-gcloud iam service-accounts create gha-provider
 gcloud iam service-accounts add-iam-policy-binding gha-provider@${GCP_PROJECT_ID}.iam.gserviceaccount.com \
+    --project=${GCP_PROJECT_ID} \
     --role="roles/iam.workloadIdentityUser" \
     --member="principalSet://iam.googleapis.com/${WORKLOAD_IDENTITY_POOL_ID}/attribute.repository/${GITHUB_REPO}"
 
